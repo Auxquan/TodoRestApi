@@ -1,5 +1,8 @@
 using Serilog;
 using Serilog.Configuration;
+using Todo.Models;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,9 +12,10 @@ Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .WriteTo.Console()
     .WriteTo.File("logs/myapp.txt", rollingInterval: RollingInterval.Day)
-    .CreateLogger();
+.CreateLogger();
 
-builder.Host.UseSerilog(); // Используйте Serilog вместо встроенного логгера
+builder.Services.AddDbContext<TodoContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("TodoDatabase")));
+builder.Host.UseSerilog();
 builder.Services.AddHealthChecks();
 // Add services to the container.
 builder.Services.AddControllers();

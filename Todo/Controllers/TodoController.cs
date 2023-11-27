@@ -1,98 +1,95 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Todo.Models;
+using Microsoft.EntityFrameworkCore;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Todo.Controllers
 {
+    [ApiController]
+    [Route("[controller]")]
+    public class TodoController : ControllerBase
+    {
+        private readonly TodoContext _context;
 
-        [ApiController]
-        [Route("[controller]")]
-        public class ItemsController : ControllerBase
+        public TodoController(TodoContext context)
         {
-        private readonly ILogger<ItemsController> _logger;
-
-        public ItemsController(ILogger<ItemsController> logger)
-        {
-            _logger = logger;
+            _context = context;
         }
 
-        private static readonly List<TodoItem> _items = new List<TodoItem>
-            {
-            new TodoItem { Id = 1, Time = "00:00", Title = "Item 1", Description = "Task1", IsComplete = true },
-            new TodoItem { Id = 2, Time = "00:00", Title = "Item 2", Description = "Task1", IsComplete = false },
-            // Предварительно заполненные элементы
-            };
-
-            // GET: /Items
-            [HttpGet]
-            public IEnumerable<TodoItem> Get()
-            {
-                _logger.LogInformation("Getting all items");
-                return _items;
-            }
-
-            // GET: /Items/id
-            [HttpGet("{id}")]
-            public ActionResult<TodoItem> GetItem(int id)
-            {
-                _logger.LogInformation($"Fetching item with id {id}");
-                 var item = _items.Find(i => i.Id == id);
-                if (item == null)
-                {
-                    return NotFound();
-                }
-                return item;
-            }
-
-            // POST: /Items
-            [HttpPost]
-            public ActionResult<TodoItem> PostItem(TodoItem newItem)
-            {
-                // Проверяем, существует ли элемент с таким же ID.
-                if (_items.Any(i => i.Id == newItem.Id))
-                {
-                    _logger.LogWarning($"Attempt to create a duplicate item with ID {newItem.Id}");
-                    // Возвращаем статусный код 409 Conflict, если элемент с таким ID уже существует.
-                    return Conflict(new { message = $"An item with ID {newItem.Id} already exists." });
-                }
-
-                // Добавляем новый элемент, если ID уникальный.
-                _items.Add(newItem);
-                _logger.LogInformation($"Item with ID {newItem.Id} created");
-                return CreatedAtAction(nameof(GetItem), new { id = newItem.Id }, newItem);
-            }
-
-
-            // PUT: /Items/{id}
-            [HttpPut("{id}")]
-            public IActionResult PutItem(int id, TodoItem updatedItem)
-            {
-                var item = _items.Find(i => i.Id == id);
-                if (item == null)
-                {
-                    return NotFound();
-                }
-
-                item.Time = updatedItem.Time;
-                item.Title = updatedItem.Title;
-                item.IsComplete = updatedItem.IsComplete;
-                item.Description = updatedItem.Description;
-
-                return NoContent();
-            }
-
-            // DELETE: /Items/{id}
-            [HttpDelete("{id}")]
-            public IActionResult DeleteItem(int id)
-            {
-                var itemIndex = _items.FindIndex(i => i.Id == id);
-                if (itemIndex == -1)
-                {
-                    return NotFound();
-                }
-
-                _items.RemoveAt(itemIndex);
-                return NoContent();
-            }
+        // GET: /Todo
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<TodoItem>>> GetAll()
+        {
+            return await _context.TodoItems.ToListAsync();
         }
+
+        // GET: /Todo/{id}
+        [HttpGet("{id}")]
+        public async Task<ActionResult<TodoItem>> Get(int id)
+        {
+            var todoItem = await _context.TodoItems.FindAsync(id);
+            if (todoItem == null)
+            {
+                return NotFound();
+            }
+            return todoItem;
+        }
+
+        // POST: /Todo
+        [HttpPost]
+        public async Task<ActionResult<TodoItem>> Post(TodoItem todoItem)
+        {
+            _context.TodoItems.Add(todoItem);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(Get), new { id = todoItem.Id }, todoItem);
+        }
+
+        // PUT: /Todo/{id}
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Put(int id, TodoItem todoItem)
+        {
+            if (id != todoItem.Id)
+            {
+                return BadRequest();
+            }
+
+            _context.Entry(todoItem).State = EntityState.Modified;
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!_context.TodoItems.Any(e => e.Id == id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
+        }
+
+        // DELETE: /Todo/{id}
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var todoItem = await _context.TodoItems.FindAsync(id);
+            if (todoItem == null)
+            {
+                return NotFound();
+            }
+
+            _context.TodoItems.Remove(todoItem);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+    }
 }
